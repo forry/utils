@@ -56,3 +56,5 @@ def call(){
        emailext attachLog: true, body: mailbody, subject: "$JOB_NAME - Build # $BUILD_NUMBER - $result!", to: env.geRecipients, from: 'jenkins', attachmentsPattern: 'test.txt'
    }
 }
+
+return this;
