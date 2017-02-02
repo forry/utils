@@ -15,7 +15,7 @@ def call(){
              sh "mkdir ${buildDir}"
              dir(buildDir) 
              {
-               sh "${cmake} -G \"Visual Studio 12 2013 Win64\" ../${buildDir}"
+               sh "${cmake} -G \"Visual Studio 12 2013 Win64\" ../${repo}"
              }
              def msbuild = tool name: 'MSBUILD4', type: 'hudson.plugins.msbuild.MsBuildInstallation'
              echo "${msbuild}"
