@@ -2,9 +2,9 @@ rem @echo off
 rem set WORKSPACE="C:\jenkins_slave\workspace\GPUnGine_tests_msvc2013"
 mkdir %WORKSPACE%\log
 echo "flag0"
-del log\* /Q
+del %WORKSPACE%\log\* /Q
 
-cd build\bin
+cd %WORKSPACE%\gpuengine-code-build\bin\
 set /a "RET=0"
 
 FOR %%i in (*.exe) do (
@@ -13,5 +13,4 @@ FOR %%i in (*.exe) do (
    set /a "RET|=%errorlevel%"
 )
 
-cd ..\..
 exit %RET%

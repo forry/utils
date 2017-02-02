@@ -22,6 +22,7 @@ def call(){
              def msbuild = tool name: 'MSBUILD4', type: 'hudson.plugins.msbuild.MsBuildInstallation'
              bat "${msbuild}/msbuild.exe /p:Configuration=release ${buildDir}/ALL_BUILD.vcxproj"
              
+             bat "${buildScript}/runTests.bat"
              /*writeFile file: 'testx.txt', text: "#$BUILD_NUMBER"
              stash includes: 'testx.txt', name: 'unit_tests', useDefaultExcludes: false*/
              result = "SUCCESS"
