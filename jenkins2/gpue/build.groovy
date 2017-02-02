@@ -4,7 +4,7 @@ def call(){
 
    stage('builds')
    {
-      node('windows' && 'msvc2013') {
+      node('windows' && 'msvc2015') {
           try{
              def repo = 'gpuengine-code'
              def buildDir = 'gpuengine-code-build'
@@ -12,17 +12,15 @@ def call(){
              checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'build_script'], [$class: 'SparseCheckoutPaths', sparseCheckoutPaths: [[path: 'jenkins2/gpue']]]], submoduleCfg: [], userRemoteConfigs: [[url: 'https://github.com/forry/utils.git']]])
              checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: repo]], submoduleCfg: [], userRemoteConfigs: [[url: 'git://git.code.sf.net/p/gpuengine/code']]])
              def cmake = tool name: 'CMake', type: 'hudson.plugins.cmake.CmakeTool'
-             echo "${cmake}"
+             //clean build dir
              sh "rm -rf ${buildDir}"
              sh "mkdir ${buildDir}"
              dir(buildDir) 
              {
-               sh "${cmake} -C ../${buildScript}/msvc2013/cache_min.cmake -G \"Visual Studio 12 2013 Win64\" ../${repo}"
+               sh "${cmake} -C ../${buildScript}/msvc2015/cache_min.cmake -G \"Visual Studio 14 2015 Win64\" ../${repo}"
              }
              def msbuild = tool name: 'MSBUILD4', type: 'hudson.plugins.msbuild.MsBuildInstallation'
-             echo "${msbuild}"
-             sh "echo ${msbuild}"
-             sh "${msbuild}/msbuild.exe ${buildDir}/ALL_BUILD.vcxproj"
+             bat "${msbuild}/msbuild.exe /p:Configuration=release ${buildDir}/ALL_BUILD.vcxproj"
              
              /*writeFile file: 'testx.txt', text: "#$BUILD_NUMBER"
              stash includes: 'testx.txt', name: 'unit_tests', useDefaultExcludes: false*/
