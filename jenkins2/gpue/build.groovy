@@ -6,22 +6,24 @@ def call(){
    {
       node('windows' && 'msvc2013') {
           try{
-             //checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'gpuengine-test-code']], submoduleCfg: [], userRemoteConfigs: [[url: 'git://git.code.sf.net/p/gpuengine-test/code']]])
-             /*def cmake = tool name: 'CMake', type: 'hudson.plugins.cmake.CmakeTool'
-             //echo "${cmake}"
-             sh 'rm -rf gpuengine-test-build'
-             sh 'mkdir gpuengine-test-build'
-             dir('gpuengine-test-build') 
+             def repo = 'gpuengine-code'
+             def buildDir = 'gpuengine-code-build'
+             checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: repo]], submoduleCfg: [], userRemoteConfigs: [[url: 'git://git.code.sf.net/p/gpuengine/code']]])
+             def cmake = tool name: 'CMake', type: 'hudson.plugins.cmake.CmakeTool'
+             echo "${cmake}"
+             sh "rm -rf ${buildDir}"
+             sh "mkdir ${buildDir}"
+             dir(buildDir}) 
              {
-              sh "${cmake} -G \"Visual Studio 12 2013 Win64\" ../gpuengine-test-code"
+               sh "${cmake} -G \"Visual Studio 12 2013 Win64\" ../${buildDir}"
              }
              def msbuild = tool name: 'MSBUILD4', type: 'hudson.plugins.msbuild.MsBuildInstallation'
              echo "${msbuild}"
              sh "echo ${msbuild}"
-             sh "${msbuild}/msbuild.exe gpuengine-test-build/ALL_BUILD.vcxproj"
-             */
-             writeFile file: 'testx.txt', text: "#$BUILD_NUMBER"
-             stash includes: 'testx.txt', name: 'unit_tests', useDefaultExcludes: false
+             sh "${msbuild}/msbuild.exe ${buildDir}/ALL_BUILD.vcxproj"
+             
+             /*writeFile file: 'testx.txt', text: "#$BUILD_NUMBER"
+             stash includes: 'testx.txt', name: 'unit_tests', useDefaultExcludes: false*/
              result = "SUCCESS"
           } catch (e)
           {
@@ -53,9 +55,9 @@ def call(){
    {
       node('master')
       {
-          unstash 'unit_tests'
+          //unstash 'unit_tests'
           def mailbody = "$JOB_NAME - Build # $BUILD_NUMBER - $result:\n\nCheck console output at $BUILD_URL to view the results."
-          emailext attachLog: true, body: mailbody, subject: "$JOB_NAME - Build # $BUILD_NUMBER - $result!", to: env.geRecipients, from: 'jenkins', attachmentsPattern: 'testx.txt'
+          //emailext attachLog: true, body: mailbody, subject: "$JOB_NAME - Build # $BUILD_NUMBER - $result!", to: env.geRecipients, from: 'jenkins', attachmentsPattern: 'testx.txt'
       }
    }
 }
