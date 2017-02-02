@@ -8,6 +8,7 @@ def call(){
           try{
              def repo = 'gpuengine-code'
              def buildDir = 'gpuengine-code-build'
+             def buildScript = 'build_script/jenkins2/gpue'
              checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: repo]], submoduleCfg: [], userRemoteConfigs: [[url: 'git://git.code.sf.net/p/gpuengine/code']]])
              def cmake = tool name: 'CMake', type: 'hudson.plugins.cmake.CmakeTool'
              echo "${cmake}"
@@ -15,7 +16,7 @@ def call(){
              sh "mkdir ${buildDir}"
              dir(buildDir) 
              {
-               sh "${cmake} -G \"Visual Studio 12 2013 Win64\" ../${repo}"
+               sh "${cmake} -C ${buildScript}/msvc2013/cache_min.cmake -G \"Visual Studio 12 2013 Win64\" ../${repo}"
              }
              def msbuild = tool name: 'MSBUILD4', type: 'hudson.plugins.msbuild.MsBuildInstallation'
              echo "${msbuild}"
