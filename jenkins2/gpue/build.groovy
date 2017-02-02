@@ -2,7 +2,7 @@
 def call(){
    def result = "FAILED";
 
-   stage 'builds'
+   stage('builds')
    {
       node('windows' && 'msvc2013') {
           try{
@@ -49,12 +49,14 @@ def call(){
          
       }
    }
-   stage 'notify'
-   node('master')
+   stage('notify')
    {
-       unstash 'unit_tests'
-       def mailbody = "$JOB_NAME - Build # $BUILD_NUMBER - $result:\n\nCheck console output at $BUILD_URL to view the results."
-       emailext attachLog: true, body: mailbody, subject: "$JOB_NAME - Build # $BUILD_NUMBER - $result!", to: env.geRecipients, from: 'jenkins', attachmentsPattern: 'testx.txt'
+      node('master')
+      {
+          unstash 'unit_tests'
+          def mailbody = "$JOB_NAME - Build # $BUILD_NUMBER - $result:\n\nCheck console output at $BUILD_URL to view the results."
+          emailext attachLog: true, body: mailbody, subject: "$JOB_NAME - Build # $BUILD_NUMBER - $result!", to: env.geRecipients, from: 'jenkins', attachmentsPattern: 'testx.txt'
+      }
    }
 }
 
