@@ -13,7 +13,7 @@ def call(){
              echo "${cmake}"
              sh "rm -rf ${buildDir}"
              sh "mkdir ${buildDir}"
-             dir(buildDir}) 
+             dir(buildDir) 
              {
                sh "${cmake} -G \"Visual Studio 12 2013 Win64\" ../${buildDir}"
              }
