@@ -1,6 +1,9 @@
 #!groovy
 def call(){
    def result = "FAILED";
+   def testMap = [msvc2015:false]
+   def messageColorMap = [success:'#439FE0',fail:'#E40000' ,testFail:'#FF9D3C']
+   def prefixes = [msvc2015:'msvc2015_']
 
    stage('builds')
    {
@@ -9,7 +12,9 @@ def call(){
              def repo = 'gpuengine-code'
              def buildDir = 'gpuengine-code-build'
              def buildScript = 'build_script/jenkins2/gpue'
-             checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'build_script'], [$class: 'SparseCheckoutPaths', sparseCheckoutPaths: [[path: 'jenkins2/gpue']]]], submoduleCfg: [], userRemoteConfigs: [[url: 'https://github.com/forry/utils.git']]])
+			 def buildPrefix = prefixes['msvc2015']
+			 
+             //checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'build_script'], [$class: 'SparseCheckoutPaths', sparseCheckoutPaths: [[path: 'jenkins2/gpue']]]], submoduleCfg: [], userRemoteConfigs: [[url: 'https://github.com/forry/utils.git']]])
              checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: repo]], submoduleCfg: [], userRemoteConfigs: [[url: 'git://git.code.sf.net/p/gpuengine/code']]])
              def cmake = tool name: 'CMake', type: 'hudson.plugins.cmake.CmakeTool'
              //clean build dir
@@ -22,14 +27,17 @@ def call(){
              def msbuild = tool name: 'MSBUILD4', type: 'hudson.plugins.msbuild.MsBuildInstallation'
              bat "${msbuild}/msbuild.exe /p:Configuration=release ${buildDir}/ALL_BUILD.vcxproj"
              
-             bat "${buildScript}/runTests.bat"
-             /*writeFile file: 'testx.txt', text: "#$BUILD_NUMBER"
-             stash includes: 'testx.txt', name: 'unit_tests', useDefaultExcludes: false*/
+             def testRet = bat( returnStatus: true, script: "${buildScript}/runTests.bat ${buildPrefix}")
+			 echo " Returned test value $testRet"
+			 testMap['msvc2015'] = testRet == 0;
+             stash includes: "log/${buildPrefix}out.txt", name: 'unit_tests', useDefaultExcludes: false
              result = "SUCCESS"
           } catch (e)
           {
               result = "FAILED"
-              throw e
+			  echo "MSVC2015 failed!!!!!!!!!!"
+			  printThrowable(e)
+              //throw e
           }
           finally
           {
@@ -40,14 +48,6 @@ def call(){
               { 
                   color = "#E40000"
               }
-              //def build = currentBuild.rawBuild
-              //def log = build.getLog(1000)
-              //slackSend color: color, message: body
-              //def string = log.join("\n")
-              //slackSend color: '#439FE0', message: string
-              //echo "mail to: ${env.geRecipients}"
-              //echo "$mailbody"
-              
           }
          
       }
@@ -56,11 +56,37 @@ def call(){
    {
       node('master')
       {
-          //unstash 'unit_tests'
-          def mailbody = "$JOB_NAME - Build # $BUILD_NUMBER - $result:\n\nCheck console output at $BUILD_URL to view the results."
-          //emailext attachLog: true, body: mailbody, subject: "$JOB_NAME - Build # $BUILD_NUMBER - $result!", to: env.geRecipients, from: 'jenkins', attachmentsPattern: 'testx.txt'
+		  def attachment = ""
+		  def testssubject = "SUCCEEDED"
+		  def failedTestMessage = "";
+		  testMap.each{ key, value ->
+			if(!value)
+			{
+				failedTestMessage += "$key test has FAILED!\n"
+				testssubject = "FAILED!"
+			}
+			attachment += "log/"+prefixes['msvc2015']+"out.txt"
+		  };
+		try{
+          unstash 'unit_tests'
+		} catch (e) { attachment = ""}
+		  def slackMessageColor = result == "SUCCESS"? testssubject == "SUCCEEDED" ? messageColorMap['success'] : messageColorMap['testFail'] : messageColorMap['fail']
+		  def subject = "$JOB_NAME - Build # $BUILD_NUMBER - $result!, Tests : $testssubject"
+          def mailbody = "$JOB_NAME - Build # $BUILD_NUMBER - $result, Tests : $testssubject:\n\nCheck console output at $BUILD_URL to view the results.\n"
+		  def slackMessage = subject + "\n Check console output at $BUILD_URL to view the results."
+		  echo "subject: $subject"
+		  echo "body:\n $mailbody"
+		  echo "attachement: $attachment"
+		  echo "color: $slackMessageColor"
+		  slackSend color: slackMessageColor, message: slackMessage
+          emailext attachLog: true, body: mailbody, subject: subject, to: env.geRecipients, from: 'jenkins', attachmentsPattern: attachment
       }
    }
+}
+
+def printThrowable(e)
+{
+	echo e.getMessage() + "\nSTACK TRACE:\n" + e.getStackTrace().toString();
 }
 
 return this;
