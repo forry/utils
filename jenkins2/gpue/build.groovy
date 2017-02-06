@@ -1,4 +1,6 @@
 #!groovy
+
+   
 def call(debug = false){
    def result = "FAILED";
    def testMap = [msvc2015:false]
@@ -8,22 +10,13 @@ def call(debug = false){
    stage('builds')
    {
       node('windows' && 'msvc2015') {
+         def cmGenerator = "Visual Studio 14 2015 Win64"
+         def prefixIndex = 'msvc2015'
          try{
-            def repo = 'gpuengine-code'
-            def buildDir = 'gpuengine-code-build'
-            def scripts = 'build_script/jenkins2/gpue'
-            def cmGenerator = "Visual Studio 14 2015 Win64"
-            def buildPrefix = prefixes['msvc2015']
-			 
-            checkout(repo)
-            CMakeGE(repo, scripts, buildDir, cmGenerator)
-            msbuild(buildDir)         
-            result = "SUCCESS"
-            
-            testMap['msvc2015'] = runTests(scripts, buildPrefix)
-            
-            stash includes: "log/${buildPrefix}out.txt", name: 'unit_tests', useDefaultExcludes: false
-            
+            def success = false;
+            success = msvcXBuild(cmGenerator, prefixIndex, prefixes, testMap)
+            result = success ? "SUCCESS" : "FAILED";
+            echo "${result}"
          } catch (e)
          {
             result = "FAILED"
@@ -31,16 +24,6 @@ def call(debug = false){
                echo "MSVC2015 failed!!!!!!!!!!"
 			   printThrowable(e)
             //throw e
-         }
-         finally
-         {
-            def body = ""
-            def color = "#36A64F"
-            body = "$result Job $JOB_NAME #$BUILD_NUMBER\n ${BUILD_URL}console"
-            if(result != "SUCCESS")
-            { 
-               color = "#E40000"
-            }              
          }
          
       }
@@ -75,7 +58,7 @@ def call(debug = false){
             echo "color: $slackMessageColor"
          }
          slackSend color: slackMessageColor, message: slackMessage
-         emailext attachLog: true, body: mailbody, subject: subject, to: env.geRecipients, from: 'jenkins', attachmentsPattern: attachment
+         //emailext attachLog: true, body: mailbody, subject: subject, to: env.geRecipients, from: 'jenkins', attachmentsPattern: attachment
       }
    }
 }
@@ -85,9 +68,33 @@ def printThrowable(e)
 	echo e.getMessage() + "\nSTACK TRACE:\n" + e.getStackTrace().toString();
 }
 
-def checkout(gpueRepo)
+def msvcXBuild(generator, prefixIndex, prefixes, testMap)
+{
+   def buildSuccess = false;
+   def repo = 'gpuengine-code'
+   def buildDir = 'gpuengine-code-build'
+   def scripts = 'build_script/jenkins2/gpue'
+   def buildPrefix = prefixes[prefixIndex]
+
+   checkoutRepos(repo)
+
+   CMakeGE(repo, scripts, buildDir, generator)
+   msbuildGE(buildDir)
+   
+   buildSuccess = true;
+   
+   testMap[prefixIndex] = runTests(scripts, buildPrefix)
+   
+   stash includes: "log/${buildPrefix}out.txt", name: 'unit_tests', useDefaultExcludes: false
+   
+   return buildSuccess;
+            
+}
+
+def checkoutRepos(gpueRepo)
 {
    checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'build_script'], [$class: 'SparseCheckoutPaths', sparseCheckoutPaths: [[path: 'jenkins2/gpue']]]], submoduleCfg: [], userRemoteConfigs: [[url: 'https://github.com/forry/utils.git']]])
+   
    checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: gpueRepo]], submoduleCfg: [], userRemoteConfigs: [[url: 'git://git.code.sf.net/p/gpuengine/code']]])
 }
 
@@ -103,7 +110,7 @@ def CMakeGE(repo, scriptDir, buildDir, generator)
    }
 }
 
-def msbuild(buildDir)
+def msbuildGE(buildDir)
 {
    def msbuild = tool name: 'MSBUILD4', type: 'hudson.plugins.msbuild.MsBuildInstallation'
    bat "${msbuild}/msbuild.exe /p:Configuration=release ${buildDir}/ALL_BUILD.vcxproj"
@@ -114,4 +121,5 @@ def runTests(scripts, buildPrefix)
    def testRet = bat( returnStatus: true, script: "${scripts}/runTests.bat ${buildPrefix}")
    return testRet == 0;
 }
+
 return this;
