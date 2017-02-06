@@ -2,7 +2,7 @@
 def call(debug = false){
    def result = "FAILED";
    def testMap = [msvc2015:false]
-   def messageColorMap = [success:'#439FE0',fail:'#E40000' ,testFail:'#FF9D3C']
+   def messageColorMap = [success:'#36A64F',fail:'#E40000' ,testFail:'#FF9D3C']
    def prefixes = [msvc2015:'msvc2015_']
 
    stage('builds')
