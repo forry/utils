@@ -3,13 +3,13 @@
    
 def call(debug = false){
    def result = "FAILED";
-   def testMap = [msvc2015:false]
+   def testMap = [msvc2015:false, gcc:false]
    def messageColorMap = [success:'#36A64F',fail:'#E40000' ,testFail:'#FF9D3C']
-   def prefixes = [msvc2015:'msvc2015_']
+   def prefixes = [msvc2015:'msvc2015_', gcc:'gcc_']
 
    stage('builds')
    {
-      node('windows' && 'msvc2015') {
+      /*node('windows' && 'msvc2015') {
          def cmGenerator = "Visual Studio 14 2015 Win64"
          def prefixIndex = 'msvc2015'
          try{
@@ -26,6 +26,21 @@ def call(debug = false){
             //throw e
          }
          
+      }*/
+      
+      node('linux' && 'gcc'){
+         def cmGenerator = "Unix Makefiles"
+         def prefixIndex = 'gcc'
+         try{
+            def success = false;
+            success = makeBuild(cmGenerator, prefixIndex, prefixes, testMap)
+         } catch (e){
+            result = "FAILED"
+            if(debug)
+               echo "MSVC2015 failed!!!!!!!!!!"
+			   printThrowable(e)
+            //throw e
+         }
       }
    }
    stage('notify')
@@ -91,6 +106,18 @@ def msvcXBuild(generator, prefixIndex, prefixes, testMap)
             
 }
 
+def makeBuild(generator, prefixIndex, prefixes, testMap)
+{
+   def buildSuccess = false;
+   def repo = 'gpuengine-code'
+   def buildDir = 'gpuengine-code-build'
+   def scripts = 'build_script/jenkins2/gpue'
+   def buildPrefix = prefixes[prefixIndex]
+
+   checkoutRepos(repo)
+   CMakeGE(repo, scripts, buildDir, generator)
+}
+
 def checkoutRepos(gpueRepo)
 {
    checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'build_script'], [$class: 'SparseCheckoutPaths', sparseCheckoutPaths: [[path: 'jenkins2/gpue']]]], submoduleCfg: [], userRemoteConfigs: [[url: 'https://github.com/forry/utils.git']]])
@@ -114,6 +141,11 @@ def msbuildGE(buildDir)
 {
    def msbuild = tool name: 'MSBUILD4', type: 'hudson.plugins.msbuild.MsBuildInstallation'
    bat "${msbuild}/msbuild.exe /p:Configuration=release ${buildDir}/ALL_BUILD.vcxproj"
+}
+
+def gccBuildGE(buildDir)
+{
+   sh "make ${buildDir}"
 }
 
 def runTests(scripts, buildPrefix)
