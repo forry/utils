@@ -2,31 +2,33 @@
 
    
 def call(debug = false){
-   def result = "FAILED";
+   def jenkinsFail = false;
+   def anyBuildFailed = false;
    def testMap = [msvc2015:false, gcc:false]
    def messageColorMap = [success:'#36A64F',fail:'#E40000' ,testFail:'#FF9D3C']
    def prefixes = [msvc2015:'msvc2015_', gcc:'gcc_']
 
    stage('builds')
    {
-      /*node('windows' && 'msvc2015') {
+      node('windows' && 'msvc2015') {
          def cmGenerator = "Visual Studio 14 2015 Win64"
          def prefixIndex = 'msvc2015'
          try{
             def success = false;
             success = msvcXBuild(cmGenerator, prefixIndex, prefixes, testMap)
             result = success ? "SUCCESS" : "FAILED";
+            anyBuildFailed = success ? anyBuildFailed : true;
             echo "${result}"
          } catch (e)
          {
-            result = "FAILED"
+            jenkinsFail = true
             if(debug)
                echo "MSVC2015 failed!!!!!!!!!!"
 			   printThrowable(e)
             //throw e
          }
          
-      }*/
+      }
       
       node('linux' && 'gcc'){
          def cmGenerator = "Unix Makefiles"
@@ -34,10 +36,12 @@ def call(debug = false){
          try{
             def success = false;
             success = makeBuild(cmGenerator, prefixIndex, prefixes, testMap)
+            result = success ? "SUCCESS" : "FAILED";
+            anyBuildFailed = success ? anyBuildFailed : true;
          } catch (e){
-            result = "FAILED"
+            jenkinsFail = true
             if(debug)
-               echo "MSVC2015 failed!!!!!!!!!!"
+               echo "linux failed!!!!!!!!!!"
 			   printThrowable(e)
             //throw e
          }
@@ -48,23 +52,64 @@ def call(debug = false){
       node('master')
       {
          def attachment = ""
-         def testssubject = "SUCCEEDED"
+         def testssubject = "SUCCESS"
          def failedTestMessage = "";
-         testMap.each{ key, value ->
-			if(!value)
-			{
-				failedTestMessage += "$key test has FAILED!\n"
-				testssubject = "FAILED!"
-			}
-			attachment += "log/"+prefixes['msvc2015']+"out.txt"
-		  };
-		try{
-          unstash 'unit_tests'
-		} catch (e) { attachment = ""}
-         def slackMessageColor = result == "SUCCESS"? testssubject == "SUCCEEDED" ? messageColorMap['success'] : messageColorMap['testFail'] : messageColorMap['fail']
-         def subject = "$JOB_NAME - Build # $BUILD_NUMBER - $result!, Tests : $testssubject"
-         def mailbody = "$JOB_NAME - Build # $BUILD_NUMBER - $result, Tests : $testssubject:\n\nCheck console output at $BUILD_URL to view the results.\n"
-         def slackMessage = subject + "\n Check console output at $BUILD_URL to view the results."
+         def buildResult = anyBuildFailed ? "FAILED" : "SUCCESS"
+         
+         def slackMessageColor = ""
+         def subject = ""
+         def mailbody = ""
+         def slackMessage = ""
+         
+         if(jenkinsFail)
+         {
+            slackMessageColor = messageColorMap['fail']
+            subject = "$JOB_NAME - Build # $BUILD_NUMBER - Jenkins FAIL"
+            mailbody = "$JOB_NAME - Build # $BUILD_NUMBER - Jenkins FAIL! \n\nCheck console output at ${BUILD_URL}console to view the results.\n${failedTestMessage}"
+            slackMessage = subject + "\n Check console output at ${BUILD_URL}console to view the results."
+         }
+         else
+         {
+            try{
+               sh 'if [ ! -d ./log ]; then mkdir ./log; fi'
+               sh 'rm -rf ./log/*'
+            } catch (e)
+            {
+               printThrowable(e)
+            }
+            
+            dir('log')
+            {        
+               for(iter in  mapToList(testMap))
+               { 
+                  if(!iter.value)
+                  {
+                     failedTestMessage += "$iter.key test has FAIL!\n"
+                     testssubject = "FAIL!"
+                     echo "test ${iter.key} : ${iter.value} failed!"
+                  }
+                  else
+                  {
+                     try{
+                        def klic = iter.key.toString()
+                        string stname = prefixes[klic]+"unit_tests"
+                        echo "${stname}"
+                        unstash stname
+                     } catch (e) { 
+                        echo "${iter.key} FAIL"
+                        printThrowable(e)                  
+                     }
+                  }
+               }
+            }
+            
+            subject = "$JOB_NAME - Build # $BUILD_NUMBER - $buildResult!, Tests : $testssubject"
+            mailbody = "$JOB_NAME - Build # $BUILD_NUMBER - $buildResult, Tests : $testssubject:\n\nCheck console output at ${BUILD_URL}console to view the results.\n${failedTestMessage}"
+            attachment = "log/*"
+            slackMessageColor = result == "SUCCESS"? testssubject == "SUCCESS" ? messageColorMap['success'] : messageColorMap['testFail'] : messageColorMap['fail']
+            slackMessage = subject + "\n Check console output at ${BUILD_URL}console to view the results."
+            
+         }
          if(debug)
          {
             echo "subject: $subject"
@@ -73,14 +118,14 @@ def call(debug = false){
             echo "color: $slackMessageColor"
          }
          slackSend color: slackMessageColor, message: slackMessage
-         //emailext attachLog: true, body: mailbody, subject: subject, to: env.geRecipients, from: 'jenkins', attachmentsPattern: attachment
+         emailext attachLog: true, body: mailbody, subject: subject, to: env.geRecipients, from: 'jenkins', attachmentsPattern: attachment
       }
    }
 }
 
 def printThrowable(e)
 {
-	echo e.getMessage() + "\nSTACK TRACE:\n" + e.getStackTrace().toString();
+	echo e.toString() + "\nSTACK TRACE:\n" + e.getStackTrace().toString();
 }
 
 def msvcXBuild(generator, prefixIndex, prefixes, testMap)
@@ -91,16 +136,19 @@ def msvcXBuild(generator, prefixIndex, prefixes, testMap)
    def scripts = 'build_script/jenkins2/gpue'
    def buildPrefix = prefixes[prefixIndex]
 
-   checkoutRepos(repo)
-
+   /*checkoutRepos(repo)
    CMakeGE(repo, scripts, buildDir, generator)
    msbuildGE(buildDir)
-   
+*/
    buildSuccess = true;
    
-   testMap[prefixIndex] = runTests(scripts, buildPrefix)
+   testMap[prefixIndex] = runTestsWin(scripts, buildPrefix)
    
-   stash includes: "log/${buildPrefix}out.txt", name: 'unit_tests', useDefaultExcludes: false
+   dir('log')
+   {
+      echo "${buildPrefix}unit_tests"
+      stash includes: "${buildPrefix}tests.txt", name: "${buildPrefix}unit_tests", useDefaultExcludes: false
+   }
    
    return buildSuccess;
             
@@ -114,8 +162,20 @@ def makeBuild(generator, prefixIndex, prefixes, testMap)
    def scripts = 'build_script/jenkins2/gpue'
    def buildPrefix = prefixes[prefixIndex]
 
-   checkoutRepos(repo)
+   /*checkoutRepos(repo)
    CMakeGE(repo, scripts, buildDir, generator)
+   gccBuildGE(buildDir)
+   */
+   buildSuccess = true;
+   
+   testMap[prefixIndex] = runTestsLinux(buildPrefix, buildDir)
+   
+   dir('log')
+   {
+      echo "${buildPrefix}unit_tests"
+      stash includes: "${buildPrefix}tests.txt", name: "${buildPrefix}unit_tests", useDefaultExcludes: false
+   }
+   return buildSuccess;
 }
 
 def checkoutRepos(gpueRepo)
@@ -145,13 +205,30 @@ def msbuildGE(buildDir)
 
 def gccBuildGE(buildDir)
 {
-   sh "make ${buildDir}"
+   sh "make -j4 -C ${buildDir}"
 }
 
-def runTests(scripts, buildPrefix)
+def runTestsWin(scripts, buildPrefix)
 {
    def testRet = bat( returnStatus: true, script: "${scripts}/runTests.bat ${buildPrefix}")
    return testRet == 0;
+}
+
+def runTestsLinux(buildPrefix, buildDir)
+{
+   sh 'if [ ! -d ./log ]; then mkdir ./log; fi'
+   sh 'rm -rf ./log/*'
+   def testRet = sh returnStatus: true, script: "run-parts ${buildDir}/tests/ > ./log/${buildPrefix}tests.txt"
+   return testRet == 0;
+}
+
+@NonCPS
+def mapToList(depmap) {
+    def dlist = []
+    for (def entry2 in depmap) {
+        dlist.add(new java.util.AbstractMap.SimpleImmutableEntry(entry2.key, entry2.value))
+    }
+    dlist
 }
 
 return this;

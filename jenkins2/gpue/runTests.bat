@@ -8,7 +8,7 @@ cd "%WORKSPACE%/gpuengine-code-build/bin/"
 set /a "RET=0"
 
 FOR %%i in (*.exe) do (
-   %%i >> %WORKSPACE%/log/%1out.txt
+   %%i >> %WORKSPACE%/log/%1tests.txt
    IF !errorlevel! neq 0 echo test/app %%i exited with error !errorlevel!
    set /a "RET|=!errorlevel!"
 )
