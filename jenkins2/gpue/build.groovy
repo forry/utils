@@ -8,9 +8,17 @@ def call(debug = false){
    def messageColorMap = [success:'#36A64F',fail:'#E40000' ,testFail:'#FF9D3C']
    def prefixes = [msvc2015:'msvc2015_', gcc:'gcc_']
 
-   stage('builds')
+   stage('waking nodes')
    {
-      node('windows' && 'msvc2015') {
+      node('master')
+      {
+         sh 'build_script/administration/WOL.py cadwork2'
+      }
+   }
+   
+   /*stage('builds')
+   {
+      node('pcmilet') {
          def cmGenerator = "Visual Studio 14 2015 Win64"
          def prefixIndex = 'msvc2015'
          try{
@@ -30,7 +38,7 @@ def call(debug = false){
          
       }
       
-      node('linux' && 'gcc'){
+      node('cadwork2'){
          def cmGenerator = "Unix Makefiles"
          def prefixIndex = 'gcc'
          try{
@@ -119,6 +127,25 @@ def call(debug = false){
          }
          slackSend color: slackMessageColor, message: slackMessage
          emailext attachLog: true, body: mailbody, subject: subject, to: env.geRecipients, from: 'jenkins', attachmentsPattern: attachment
+      }
+   }
+   */
+   stage('shutdown')
+   {
+      node('cadwork2')
+      {
+         println "trying to shutdown cadwork2 node..."
+         //vypnout cadwork2
+         def outp = sh(returnStdout: true, script: 'who')
+         if (outp == "")
+         {
+            sh 'poweroff'
+         }
+         else
+         {
+            println "someone is logged:"
+            println outp
+         }
       }
    }
 }
