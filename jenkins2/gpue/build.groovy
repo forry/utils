@@ -5,7 +5,8 @@ def call(debug = false){
    def jenkinsFail = false;
    def anyBuildFailed = false;
    def testMap = [msvc2015:false, gcc:false]
-   def messageColorMap = [success:'#36A64F',fail:'#E40000' ,testFail:'#FF9D3C']
+   def slackmessageColorMap = [success:'#36A64F',fail:'#E40000' ,testFail:'#FF9D3C'] //for slack chat
+   def hipMessageColorMap = [success:'GREEN',fail:'RED' ,testFail:'YELLOW'] //for hipChat
    def prefixes = [msvc2015:'msvc2015_', gcc:'gcc_']
    
    stage('builds')
@@ -58,16 +59,19 @@ def call(debug = false){
          def buildResult = anyBuildFailed ? "FAILED" : "SUCCESS"
          
          def slackMessageColor = ""
+         def hipMessageColor = ""
          def subject = ""
          def mailbody = ""
          def slackMessage = ""
+         def hipMessage = ""
          
          if(jenkinsFail)
          {
-            slackMessageColor = messageColorMap['fail']
-            subject = "$JOB_NAME - Build # $BUILD_NUMBER - Jenkins FAIL"
-            mailbody = "$JOB_NAME - Build # $BUILD_NUMBER - Jenkins FAIL! \n\nCheck console output at ${BUILD_URL}console to view the results.\n${failedTestMessage}"
+            slackMessageColor = slackmessageColorMap['fail']
+            subject = "$JOB_NAME - Build #$BUILD_NUMBER - Jenkins FAIL"
+            mailbody = "$JOB_NAME - Build #$BUILD_NUMBER - Jenkins FAIL! \n\nCheck console output at ${BUILD_URL}console to view the results.\n${failedTestMessage}"
             slackMessage = subject + "\n Check console output at ${BUILD_URL}console to view the results."
+            hipMessage = subject + '\n <a href="${BUILD_URL}console">Check console output to view the results.</a>'
          }
          else
          {
@@ -107,8 +111,10 @@ def call(debug = false){
             subject = "$JOB_NAME - Build # $BUILD_NUMBER - $buildResult!, Tests : $testssubject"
             mailbody = "$JOB_NAME - Build # $BUILD_NUMBER - $buildResult, Tests : $testssubject:\n\nCheck console output at ${BUILD_URL}console to view the results.\n${failedTestMessage}"
             attachment = "log/*"
-            slackMessageColor = result == "SUCCESS"? testssubject == "SUCCESS" ? messageColorMap['success'] : messageColorMap['testFail'] : messageColorMap['fail']
+            slackMessageColor = result == "SUCCESS"? testssubject == "SUCCESS" ? slackmessageColorMap['success'] : slackmessageColorMap['testFail'] : slackmessageColorMap['fail']
+            hipMessageColor = result == "SUCCESS"? testssubject == "SUCCESS" ? hipMessageColorMap['success'] : hipMessageColorMap['testFail'] : hipMessageColorMap['fail']
             slackMessage = subject + "\n Check console output at ${BUILD_URL}console to view the results."
+            hipMessage = subject + '\n <a href="${BUILD_URL}console">Check console output to view the results.</a>'
             
          }
          if(debug)
@@ -119,6 +125,7 @@ def call(debug = false){
             echo "color: $slackMessageColor"
          }
          slackSend color: slackMessageColor, message: slackMessage
+         hipchatSend color: hipMessageColor, credentialId: '', message: hipMessage, notify: true, room: 'jenkins', sendAs: 'jenkins', server: '', v2enabled: false
          emailext attachLog: true, body: mailbody, subject: subject, to: env.geRecipients, from: 'jenkins', attachmentsPattern: attachment
       }
    }
@@ -202,6 +209,7 @@ def makeBuild(generator, prefixIndex, prefixes, testMap)
       echo "${buildPrefix}unit_tests"
       stash includes: "${buildPrefix}tests.txt", name: "${buildPrefix}unit_tests", useDefaultExcludes: false
    }
+   
    return buildSuccess;
 }
 
