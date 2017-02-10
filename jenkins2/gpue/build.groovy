@@ -7,16 +7,8 @@ def call(debug = false){
    def testMap = [msvc2015:false, gcc:false]
    def messageColorMap = [success:'#36A64F',fail:'#E40000' ,testFail:'#FF9D3C']
    def prefixes = [msvc2015:'msvc2015_', gcc:'gcc_']
-
-   stage('waking nodes')
-   {
-      node('master')
-      {
-         sh 'build_script/administration/WOL.py cadwork2'
-      }
-   }
    
-   /*stage('builds')
+   stage('builds')
    {
       node('pcmilet') {
          def cmGenerator = "Visual Studio 14 2015 Win64"
@@ -55,6 +47,7 @@ def call(debug = false){
          }
       }
    }
+   
    stage('notify')
    {
       node('master')
@@ -129,7 +122,7 @@ def call(debug = false){
          emailext attachLog: true, body: mailbody, subject: subject, to: env.geRecipients, from: 'jenkins', attachmentsPattern: attachment
       }
    }
-   */
+
    stage('shutdown')
    {
       node('cadwork2')
@@ -139,7 +132,14 @@ def call(debug = false){
          def outp = sh(returnStdout: true, script: 'who')
          if (outp == "")
          {
-            sh 'poweroff'
+            try
+            {
+               sh 'sudo shutdown -P +1 &'
+            } catch(IOException ex){
+               println "Shutdown successful, node disconnected."
+            } catch(e) {
+               println "another exception... maybe the shutdown was unsuccessful"
+            }
          }
          else
          {
@@ -163,10 +163,10 @@ def msvcXBuild(generator, prefixIndex, prefixes, testMap)
    def scripts = 'build_script/jenkins2/gpue'
    def buildPrefix = prefixes[prefixIndex]
 
-   /*checkoutRepos(repo)
+   checkoutRepos(repo)
    CMakeGE(repo, scripts, buildDir, generator)
    msbuildGE(buildDir)
-*/
+
    buildSuccess = true;
    
    testMap[prefixIndex] = runTestsWin(scripts, buildPrefix)
@@ -189,10 +189,10 @@ def makeBuild(generator, prefixIndex, prefixes, testMap)
    def scripts = 'build_script/jenkins2/gpue'
    def buildPrefix = prefixes[prefixIndex]
 
-   /*checkoutRepos(repo)
+   checkoutRepos(repo)
    CMakeGE(repo, scripts, buildDir, generator)
    gccBuildGE(buildDir)
-   */
+   
    buildSuccess = true;
    
    testMap[prefixIndex] = runTestsLinux(buildPrefix, buildDir)
