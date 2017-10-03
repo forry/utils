@@ -142,6 +142,7 @@ def call(debug = false){
             try
             {
                sh 'sudo shutdown -P +1 &'
+               sleep time: 2, unit: 'MINUTES' //we need some grace period to avoid deadlock when this job is done but the node is shutting down and another job tries to wake it - the wake will not come through and the successive job will be on hold.
             } catch(IOException ex){
                println "Shutdown successful, node disconnected."
             } catch(e) {
