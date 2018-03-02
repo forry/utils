@@ -124,9 +124,15 @@ def call(debug = false){
             echo "attachement: $attachment"
             echo "color: $slackMessageColor"
          }
-         slackSend color: slackMessageColor, message: slackMessage
-         hipchatSend color: hipMessageColor, credentialId: '', message: hipMessage, notify: true, room: 'jenkins', sendAs: 'jenkins', server: '', v2enabled: false
-         emailext attachLog: true, body: mailbody, subject: subject, to: env.geRecipients, from: 'jenkins', attachmentsPattern: attachment
+         try{
+            emailext attachLog: true, body: mailbody, subject: subject, to: env.geRecipients, from: 'jenkins', attachmentsPattern: attachment
+            slackSend color: slackMessageColor, message: slackMessage
+            //seems that hipchat support is over
+            //hipchatSend color: hipMessageColor, credentialId: '', message: hipMessage, notify: true, room: 'jenkins', sendAs: 'jenkins', server: '', v2enabled: false
+         } catch (e) { 
+            echo "NOTIFICATION FAIL!!"
+            printThrowable(e)                  
+         }
       }
    }
 
