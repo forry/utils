@@ -18,7 +18,7 @@ def call(debug = false){
             def success = false;
             success = msvcXBuild(cmGenerator, prefixIndex, prefixes, testMap)
             result = success ? "SUCCESS" : "FAILED";
-            anyBuildFailed = success ? anyBuildFailed : true;
+            anyBuildFailed = success ? anyBuildFailed : true; //potential race condition?
             echo "${result}"
          } catch (e)
          {
@@ -38,7 +38,7 @@ def call(debug = false){
             def success = false;
             success = makeBuild(cmGenerator, prefixIndex, prefixes, testMap)
             result = success ? "SUCCESS" : "FAILED";
-            anyBuildFailed = success ? anyBuildFailed : true;
+            anyBuildFailed = success ? anyBuildFailed : true; //potential race condition?
          } catch (e){
             jenkinsFail = true
             if(debug)
@@ -161,6 +161,10 @@ def call(debug = false){
             println outp
          }
       }
+      if(testssubject=="FAIL!" || anyBuildFailed)
+      {
+         error 'Builds or tests failed!'
+      }
    }
 }
 
@@ -224,7 +228,7 @@ def checkoutRepos(gpueRepo)
 {
    checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'build_script'], [$class: 'SparseCheckoutPaths', sparseCheckoutPaths: [[path: 'jenkins2/gpue']]]], submoduleCfg: [], userRemoteConfigs: [[url: 'https://github.com/forry/utils.git']]])
    
-   checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: gpueRepo]], submoduleCfg: [], userRemoteConfigs: [[url: 'git://git.code.sf.net/p/gpuengine/code']]])
+   checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: gpueRepo]], submoduleCfg: [], userRemoteConfigs: [[url: 'https://github.com/Rendering-FIT/GPUEngine.git']]])
 }
 
 def CMakeGE(repo, scriptDir, buildDir, generator)
