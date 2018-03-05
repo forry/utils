@@ -161,7 +161,16 @@ def call(debug = false){
             println outp
          }
       }
-      if(testssubject=="FAIL!" || anyBuildFailed)
+      def testFailed = false
+      for(iter in  mapToList(testMap))
+      { 
+         if(!iter.value)
+         {
+            testFailed = true
+         }
+      }
+      
+      if(anyBuildFailed || testFailed)
       {
          error 'Builds or tests failed!'
       }
